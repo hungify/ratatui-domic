@@ -11,13 +11,12 @@ use crossterm::{
     cursor,
     event::{
         DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-        Event as CrosstermEvent, EventStream, KeyEvent, KeyEventKind, MouseEvent,
+        Event as CrosstermEvent, EventStream, KeyEventKind,
     },
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 use futures::{FutureExt, StreamExt};
 use ratatui::backend::CrosstermBackend as Backend;
-use serde::{Deserialize, Serialize};
 use tokio::{
     sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
     task::JoinHandle,
@@ -26,21 +25,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Event {
-    Init,
-    Quit,
-    Error,
-    Closed,
-    Tick,
-    Render,
-    FocusGained,
-    FocusLost,
-    Paste(String),
-    Key(KeyEvent),
-    Mouse(MouseEvent),
-    Resize(u16, u16),
-}
+use crate::event::Event;
 
 pub struct Tui {
     pub terminal: ratatui::Terminal<Backend<Stdout>>,

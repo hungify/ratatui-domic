@@ -6,7 +6,7 @@ use ratatui::{
 };
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{action::Action, config::Config, tui::Event};
+use crate::{action::Action, config::Config, event::Event};
 
 pub mod fps;
 pub mod home;

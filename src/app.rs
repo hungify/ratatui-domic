@@ -9,7 +9,8 @@ use crate::{
     action::Action,
     components::{fps::FpsCounter, home::Home, Component},
     config::Config,
-    tui::{Event, Tui},
+    event::Event,
+    tui::Tui,
 };
 
 pub struct App {
