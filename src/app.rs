@@ -1,23 +1,31 @@
 use color_eyre::Result;
 use crossterm::event::KeyEvent;
-use ratatui::prelude::Rect;
+use ratatui::{
+    layout::{Constraint, Direction, Layout},
+    prelude::Rect,
+};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{debug, info};
 
 use crate::{
     action::Action,
-    components::{fps::FpsCounter, home::Home, Component},
+    components::{counter::Counter, fps::FpsCounter, home::Home, Component},
     config::Config,
     event::Event,
     tui::Tui,
 };
 
+struct ComponentWithRect {
+    component: Box<dyn Component>,
+    rect: Rect,
+}
+
 pub struct App {
     config: Config,
     tick_rate: f64,
     frame_rate: f64,
-    components: Vec<Box<dyn Component>>,
+    components_with_rect: Vec<ComponentWithRect>,
     should_quit: bool,
     should_suspend: bool,
     mode: Mode,
@@ -33,12 +41,48 @@ pub enum Mode {
 }
 
 impl App {
+    fn generate_components_layout() -> Result<Vec<ComponentWithRect>> {
+        let tui = Tui::new()?;
+        let size = tui.size()?;
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(50),
+                ]
+                .as_ref(),
+            )
+            .split(Rect {
+                x: 0,
+                y: 0,
+                width: size.width,
+                height: size.height,
+            });
+
+        Ok(vec![
+            ComponentWithRect {
+                component: Box::new(Home::new()),
+                rect: chunks[0],
+            },
+            ComponentWithRect {
+                component: Box::new(FpsCounter::default()),
+                rect: chunks[1],
+            },
+            ComponentWithRect {
+                component: Box::new(Counter::default()),
+                rect: chunks[2],
+            },
+        ])
+    }
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
+
         Ok(Self {
             tick_rate,
             frame_rate,
-            components: vec![Box::new(Home::new()), Box::new(FpsCounter::default())],
+            components_with_rect: Self::generate_components_layout()?,
             should_quit: false,
             should_suspend: false,
             config: Config::new()?,
@@ -56,14 +100,18 @@ impl App {
             .frame_rate(self.frame_rate);
         tui.enter()?;
 
-        for component in self.components.iter_mut() {
-            component.register_action_handler(self.action_tx.clone())?;
+        for component_info in self.components_with_rect.iter_mut() {
+            component_info
+                .component
+                .register_action_handler(self.action_tx.clone())?;
         }
-        for component in self.components.iter_mut() {
-            component.register_config_handler(self.config.clone())?;
+        for component_info in self.components_with_rect.iter_mut() {
+            component_info
+                .component
+                .register_config_handler(self.config.clone())?;
         }
-        for component in self.components.iter_mut() {
-            component.init(tui.size()?)?;
+        for component_info in self.components_with_rect.iter_mut() {
+            component_info.component.init(tui.size()?)?;
         }
 
         let action_tx = self.action_tx.clone();
@@ -98,8 +146,11 @@ impl App {
             Event::Key(key) => self.handle_key_event(key)?,
             _ => {}
         }
-        for component in self.components.iter_mut() {
-            if let Some(action) = component.handle_events(Some(event.clone()))? {
+        for component_info in self.components_with_rect.iter_mut() {
+            if let Some(action) = component_info
+                .component
+                .handle_events(Some(event.clone()))?
+            {
                 action_tx.send(action)?;
             }
         }
@@ -148,8 +199,8 @@ impl App {
                 Action::Render => self.render(tui)?,
                 _ => {}
             }
-            for component in self.components.iter_mut() {
-                if let Some(action) = component.update(action.clone())? {
+            for component_info in self.components_with_rect.iter_mut() {
+                if let Some(action) = component_info.component.update(action.clone())? {
                     self.action_tx.send(action)?
                 };
             }
@@ -165,8 +216,10 @@ impl App {
 
     fn render(&mut self, tui: &mut Tui) -> Result<()> {
         tui.draw(|frame| {
-            for component in self.components.iter_mut() {
-                if let Err(err) = component.draw(frame, frame.area()) {
+            for component_info in self.components_with_rect.iter_mut() {
+                let component = &mut component_info.component;
+                let rect = component_info.rect;
+                if let Err(err) = component.draw(frame, rect) {
                     let _ = self
                         .action_tx
                         .send(Action::Error(format!("Failed to draw: {:?}", err)));
