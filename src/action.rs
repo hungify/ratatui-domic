@@ -12,4 +12,7 @@ pub enum Action {
     ClearScreen,
     Error(String),
     Help,
+    // Counter actions
+    IncrementBy(i32),
+    DecrementBy(i32),
 }
