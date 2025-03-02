@@ -13,6 +13,8 @@ use crate::{
     components::{counter::Counter, fps::FpsCounter, home::Home, Component},
     config::Config,
     event::Event,
+    event_handler::EventHandler,
+    state::AppState,
     tui::Tui,
 };
 
@@ -95,10 +97,15 @@ impl App {
 
     pub async fn run(&mut self) -> Result<()> {
         let mut tui = Tui::new()?
-            // .mouse(true) // uncomment this line to enable mouse support
             .tick_rate(self.tick_rate)
             .frame_rate(self.frame_rate);
         tui.enter()?;
+
+        // Create shared state once and share it with components
+        let state = AppState::new();
+
+        // Create centralized event handler
+        let event_handler = EventHandler::new(state.clone());
 
         for component_info in self.components_with_rect.iter_mut() {
             component_info
@@ -111,18 +118,22 @@ impl App {
                 .register_config_handler(self.config.clone())?;
         }
         for component_info in self.components_with_rect.iter_mut() {
+            component_info
+                .component
+                .register_state_handler(state.clone())?;
+        }
+        for component_info in self.components_with_rect.iter_mut() {
             component_info.component.init(tui.size()?)?;
         }
 
         let action_tx = self.action_tx.clone();
         loop {
-            self.handle_events(&mut tui).await?;
+            self.handle_events(&mut tui, &event_handler).await?;
             self.handle_actions(&mut tui)?;
             if self.should_suspend {
                 tui.suspend()?;
                 action_tx.send(Action::Resume)?;
                 action_tx.send(Action::ClearScreen)?;
-                // tui.mouse(true);
                 tui.enter()?;
             } else if self.should_quit {
                 tui.stop()?;
@@ -133,25 +144,25 @@ impl App {
         Ok(())
     }
 
-    async fn handle_events(&mut self, tui: &mut Tui) -> Result<()> {
+    async fn handle_events(&mut self, tui: &mut Tui, event_handler: &EventHandler) -> Result<()> {
         let Some(event) = tui.next_event().await else {
             return Ok(());
         };
+
         let action_tx = self.action_tx.clone();
-        match event {
-            Event::Quit => action_tx.send(Action::Quit)?,
-            Event::Tick => action_tx.send(Action::Tick)?,
-            Event::Render => action_tx.send(Action::Render)?,
-            Event::Resize(x, y) => action_tx.send(Action::Resize(x, y))?,
-            Event::Key(key) => self.handle_key_event(key)?,
-            _ => {}
-        }
-        for component_info in self.components_with_rect.iter_mut() {
-            if let Some(action) = component_info
-                .component
-                .handle_events(Some(event.clone()))?
-            {
-                action_tx.send(action)?;
+
+        // Handle event with the centralized event handler
+        if let Some(action) = event_handler.handle(event.clone())? {
+            action_tx.send(action)?;
+        } else {
+            // Only send standard events if not already handled by event handler
+            match event {
+                Event::Quit => action_tx.send(Action::Quit)?,
+                Event::Tick => action_tx.send(Action::Tick)?,
+                Event::Render => action_tx.send(Action::Render)?,
+                Event::Resize(x, y) => action_tx.send(Action::Resize(x, y))?,
+                Event::Key(key) => self.handle_key_event(key)?,
+                _ => {}
             }
         }
         Ok(())

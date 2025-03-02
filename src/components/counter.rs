@@ -1,5 +1,4 @@
 use color_eyre::Result;
-use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
@@ -10,12 +9,11 @@ use ratatui::{
 };
 
 use super::Component;
-use crate::action::Action;
+use crate::state::AppState;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Counter {
-    count: i32,
-    amount: String,
+    state: Option<AppState>,
 }
 
 impl Default for Counter {
@@ -26,17 +24,24 @@ impl Default for Counter {
 
 impl Counter {
     pub fn new() -> Self {
-        Self {
-            count: 0,
-            amount: String::from("1"),
-        }
+        Self { state: None }
     }
 }
 
 impl Component for Counter {
+    fn register_state_handler(&mut self, state: AppState) -> Result<()> {
+        self.state = Some(state);
+        Ok(())
+    }
+
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let increase_by_interpolation = " Increment by {amount}".replace("{amount}", &self.amount);
-        let decrease_by_interpolation = " Decrement by {amount}".replace("{amount}", &self.amount);
+        let Some(state) = &self.state else {
+            return Ok(());
+        };
+
+        let amount = state.get_amount()?;
+        let increase_by_interpolation = " Increment by {amount}".replace("{amount}", &amount);
+        let decrease_by_interpolation = " Decrement by {amount}".replace("{amount}", &amount);
 
         let instructions = Line::from(vec![
             " Increment amount".into(),
@@ -59,9 +64,10 @@ impl Component for Counter {
         let container_paragraph = Paragraph::new(Text::default()).block(container_block.clone());
         frame.render_widget(container_paragraph, area);
 
+        let count = state.get_count()?;
         let count_text = Text::from(vec![Line::from(vec![
             "Count: ".into(),
-            self.count.to_string().yellow(),
+            count.to_string().yellow(),
         ])]);
         let count_block = Block::default()
             .title_alignment(Alignment::Center)
@@ -74,7 +80,7 @@ impl Component for Counter {
         let amount_block = Block::bordered()
             .title("Amount")
             .title_alignment(Alignment::Center);
-        let amount_paragraph = Paragraph::new(self.amount.as_str())
+        let amount_paragraph = Paragraph::new(amount.as_str())
             .style(Style::default().fg(Color::Yellow))
             .block(amount_block);
 
@@ -95,40 +101,5 @@ impl Component for Counter {
         frame.render_widget(amount_paragraph, chunks_amount[0]);
         frame.render_widget(count_paragraph, chunks_count[1]);
         Ok(())
-    }
-
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Tick => {}
-            Action::Render => {}
-            Action::IncrementBy(n) => self.count = self.count.saturating_add(n),
-            Action::DecrementBy(n) => self.count = self.count.saturating_sub(n),
-            _ => {}
-        }
-        Ok(None)
-    }
-
-    fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        let amount_number = self.amount.parse::<i32>().unwrap_or(1);
-        match key.code {
-            KeyCode::Left => Ok(Some(Action::DecrementBy(amount_number))),
-            KeyCode::Right => Ok(Some(Action::IncrementBy(amount_number))),
-            KeyCode::Up => {
-                let value = self.amount.parse::<i32>().unwrap_or(1);
-                self.amount = value.saturating_add(1).to_string();
-                Ok(None)
-            }
-            KeyCode::Down => {
-                let value = self.amount.parse::<i32>().unwrap_or(1);
-                self.amount = if value > 1 {
-                    value.saturating_sub(1).to_string()
-                } else {
-                    value.to_string()
-                };
-                Ok(None)
-            }
-
-            _ => Ok(None),
-        }
     }
 }

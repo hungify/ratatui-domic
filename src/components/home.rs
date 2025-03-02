@@ -1,49 +1,63 @@
 use color_eyre::Result;
-use ratatui::{prelude::*, widgets::*};
-use tokio::sync::mpsc::UnboundedSender;
+use ratatui::{
+    layout::Alignment,
+    style::Stylize,
+    text::{Line, Text},
+    widgets::{Block, BorderType, Borders, Paragraph},
+    Frame,
+};
+
+use crate::state::AppState;
 
 use super::Component;
-use crate::{action::Action, config::Config};
 
-#[derive(Default)]
+#[derive(Debug, Clone)]
 pub struct Home {
-    command_tx: Option<UnboundedSender<Action>>,
-    config: Config,
+    state: Option<AppState>,
 }
 
 impl Home {
     pub fn new() -> Self {
-        Self::default()
+        Self { state: None }
     }
 }
 
 impl Component for Home {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.command_tx = Some(tx);
+    fn register_state_handler(&mut self, state: AppState) -> Result<()> {
+        self.state = Some(state);
         Ok(())
     }
 
-    fn register_config_handler(&mut self, config: Config) -> Result<()> {
-        self.config = config;
-        Ok(())
-    }
+    fn draw(&mut self, frame: &mut Frame, area: ratatui::prelude::Rect) -> Result<()> {
+        let Some(state) = &self.state else {
+            return Ok(());
+        };
 
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Tick => {
-                // add any logic here that should run on every tick
-            }
-            Action::Render => {
-                // add any logic here that should run on every render
-            }
-            _ => {}
-        }
-        Ok(None)
-    }
+        let count = state.get_count()?;
+        let amount = state.get_amount()?;
 
-    fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let msg = "Ratatui Starter Template";
-        frame.render_widget(Paragraph::new(msg), area);
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded);
+
+        let text = Text::from(vec![
+            Line::from(vec!["Welcome to ".into(), "Ratatui Domic".blue().bold()]),
+            Line::from(""),
+            Line::from(vec![
+                "Current counter: ".into(),
+                count.to_string().yellow().bold(),
+            ]),
+            Line::from(vec![
+                "Current increment amount: ".into(),
+                amount.yellow().bold(),
+            ]),
+        ]);
+
+        let paragraph = Paragraph::new(text)
+            .block(block)
+            .alignment(Alignment::Center);
+
+        frame.render_widget(paragraph, area);
         Ok(())
     }
 }

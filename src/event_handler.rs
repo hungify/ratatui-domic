@@ -1,11 +1,7 @@
 use color_eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::{
-    action::Action,
-    event::Event,
-    state::AppState,
-};
+use crate::{action::Action, event::Event, state::AppState};
 
 pub struct EventHandler {
     state: AppState,
@@ -19,16 +15,11 @@ impl EventHandler {
     pub fn handle(&self, event: Event) -> Result<Option<Action>> {
         match event {
             Event::Key(key) => self.handle_key_event(key),
-            Event::Mouse(_mouse) => Ok(None),
-            Event::Resize(width, height) => Ok(Some(Action::Resize(width, height))),
-            Event::Tick => Ok(Some(Action::Tick)),
-            Event::Render => Ok(Some(Action::Render)),
             _ => Ok(None),
         }
     }
 
     fn handle_key_event(&self, key: KeyEvent) -> Result<Option<Action>> {
-        // Global key handlers that work regardless of context
         match key.code {
             KeyCode::Char('q') if key.modifiers.is_empty() => {
                 return Ok(Some(Action::Quit));
