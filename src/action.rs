@@ -9,9 +9,10 @@ pub enum Action {
     Suspend,
     Resume,
     Quit,
-    ClearScreen,
+    Refresh,
     Error(String),
     Help,
+    ClearScreen,
     // Counter actions
     IncrementBy(i32),
     DecrementBy(i32),

@@ -1,12 +1,11 @@
 use color_eyre::Result;
-use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{
     layout::{Rect, Size},
     Frame,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{action::Action, config::Config, event::Event};
+use crate::{action::Action, config::Config, state::AppState};
 
 pub mod counter;
 pub mod fps;
@@ -17,6 +16,11 @@ pub mod home;
 /// Implementors of this trait can be registered with the main application loop and will be able to
 /// receive events, update state, and be rendered on the screen.
 pub trait Component {
+    fn register_state_handler(&mut self, state: AppState) -> Result<()> {
+        let _ = state; // to appease clippy
+        Ok(())
+    }
+
     /// Register an action handler that can send actions for processing if necessary.
     ///
     /// # Arguments
@@ -55,49 +59,6 @@ pub trait Component {
     fn init(&mut self, area: Size) -> Result<()> {
         let _ = area; // to appease clippy
         Ok(())
-    }
-    /// Handle incoming events and produce actions if necessary.
-    ///
-    /// # Arguments
-    ///
-    /// * `event` - An optional event to be processed.
-    ///
-    /// # Returns
-    ///
-    /// * `Result<Option<Action>>` - An action to be processed or none.
-    fn handle_events(&mut self, event: Option<Event>) -> Result<Option<Action>> {
-        let action = match event {
-            Some(Event::Key(key_event)) => self.handle_key_event(key_event)?,
-            Some(Event::Mouse(mouse_event)) => self.handle_mouse_event(mouse_event)?,
-            _ => None,
-        };
-        Ok(action)
-    }
-    /// Handle key events and produce actions if necessary.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - A key event to be processed.
-    ///
-    /// # Returns
-    ///
-    /// * `Result<Option<Action>>` - An action to be processed or none.
-    fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        let _ = key; // to appease clippy
-        Ok(None)
-    }
-    /// Handle mouse events and produce actions if necessary.
-    ///
-    /// # Arguments
-    ///
-    /// * `mouse` - A mouse event to be processed.
-    ///
-    /// # Returns
-    ///
-    /// * `Result<Option<Action>>` - An action to be processed or none.
-    fn handle_mouse_event(&mut self, mouse: MouseEvent) -> Result<Option<Action>> {
-        let _ = mouse; // to appease clippy
-        Ok(None)
     }
     /// Update the state of the component based on a received action. (REQUIRED)
     ///

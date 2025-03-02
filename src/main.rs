@@ -13,6 +13,8 @@ mod errors;
 mod event;
 mod logging;
 mod tui;
+mod state;
+mod event_handler;
 
 #[tokio::main]
 async fn main() -> Result<()> {
